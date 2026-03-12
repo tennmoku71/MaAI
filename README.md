@@ -59,6 +59,8 @@ To quickly get started with MaAI, you can install it using pip:
 pip install maai
 ```
 
+For the prebuilt standalone binary (TCP runtime), see [QUICKSTART.md](QUICKSTART.md).
+
 > 💡 **Note:** By default, the CPU version of PyTorch will be installed. If you wish to run MaAI on a GPU, please install the GPU version of PyTorch that matches your CUDA environment before proceeding.
 
 You can run it as follows🏃‍♂️
