@@ -8,9 +8,8 @@ import threading
 import time
 import pickle
 import queue
+import importlib
 from . import util
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 
 def _draw_bar(value: float, length: int = 30) -> str:
     """基本的なバーグラフを描画"""
@@ -265,6 +264,10 @@ class TcpTransmitter:
 class GuiBar:
     """matplotlibを用いて結果をバーグラフでGUI表示するクラス"""
     def __init__(self, bar_type: str = "normal"):
+        try:
+            plt = importlib.import_module("matplotlib.pyplot")
+        except ImportError as exc:
+            raise ImportError("matplotlib is required to use MaaiOutput.GuiBar. Install matplotlib and retry.") from exc
         self.bar_type = bar_type
         self.plt = plt
         self.fig, self.ax = plt.subplots()
@@ -320,6 +323,11 @@ class GuiBar:
         
 class GuiPlot:
     def __init__(self, shown_context_sec: int = 10, frame_rate: int = 10, sample_rate: int = 16000, figsize=(14, 10), use_fixed_draw_rate: bool = True):
+        try:
+            plt = importlib.import_module("matplotlib.pyplot")
+            mcolors = importlib.import_module("matplotlib.colors")
+        except ImportError as exc:
+            raise ImportError("matplotlib is required to use MaaiOutput.GuiPlot. Install matplotlib and retry.") from exc
         self.figsize = figsize
         self.shown_context_sec = shown_context_sec
         self.frame_rate = frame_rate
@@ -327,6 +335,7 @@ class GuiPlot:
         self.MAX_CONTEXT_LEN = frame_rate * shown_context_sec
         self.MAX_CONTEXT_WAV_LEN = sample_rate * shown_context_sec
         self.plt = plt
+        self._mcolors = mcolors
         self.fig = None
         self.axes = dict()
         self.lines = dict()
@@ -347,7 +356,7 @@ class GuiPlot:
         self.lines = {}
         self.fills = {}
         self.data_buffer = {}
-        tab_colors = list(mcolors.TABLEAU_COLORS.values())
+        tab_colors = list(self._mcolors.TABLEAU_COLORS.values())
         p_keys = [k for k in self.keys if k.startswith('p_') and k not in ('p_now', 'p_future')]
         color_map = {k: tab_colors[i % len(tab_colors)] for i, k in enumerate(p_keys)}
         th_map = {k: 0.5 for k in p_keys}
@@ -459,7 +468,7 @@ class GuiPlot:
                 self._last_draw_time = now
         if not self.initialized:
             self._init_fig(result)
-        tab_colors = list(mcolors.TABLEAU_COLORS.values())
+        tab_colors = list(self._mcolors.TABLEAU_COLORS.values())
         p_keys = [k for k in self.keys if k.startswith('p_') and k not in ('p_now', 'p_future')]
         color_map = {k: tab_colors[i % len(tab_colors)] for i, k in enumerate(p_keys)}
         for key in self.keys:

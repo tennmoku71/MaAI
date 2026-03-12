@@ -10,3 +10,15 @@ tools/output_offline.txt
 __pycache__/
 tflite_vap/
 tfjs_vap/
+
+# Nuitka build artifacts
+dist/
+nuitka-crash-report*.xml
+
+# Ignore everything under build by default,
+# then keep only the maintained Nuitka source files.
+build/*
+!build/nuitka/
+build/nuitka/*
+!build/nuitka/README.md
+!build/nuitka/maai_tcp_server.py

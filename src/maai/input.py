@@ -1,18 +1,23 @@
 import socket
-import pyaudio
 import queue
 import threading
-import soundfile as sf
+import importlib
 import os
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-import pygame
 import time
 from . import util
 import numpy as np
 import sys
 import locale
 
+pyaudio = None
+
 def available_mic_devices(print_out=True):
+    if pyaudio is None:
+        try:
+            globals()["pyaudio"] = importlib.import_module("pyaudio")
+        except ImportError as exc:
+            raise ImportError("pyaudio is required for microphone device enumeration. Install pyaudio to use Mic/TcpMic.") from exc
     p = pyaudio.PyAudio()
     device_info = {}
     
@@ -84,6 +89,11 @@ class Mic(Base):
     def __init__(self, audio_gain=1.0, mic_device_index=-1, device_name=None):
         
         super().__init__()
+        if pyaudio is None:
+            try:
+                globals()["pyaudio"] = importlib.import_module("pyaudio")
+            except ImportError as exc:
+                raise ImportError("pyaudio is required to use MaaiInput.Mic. Install pyaudio and retry.") from exc
         
         self.p = pyaudio.PyAudio()
         self.audio_gain = audio_gain
@@ -130,6 +140,14 @@ class Mic(Base):
 class Wav(Base):
     def __init__(self, wav_file_path, audio_gain=1.0):
         super().__init__()
+        try:
+            self.sf = importlib.import_module("soundfile")
+        except ImportError as exc:
+            raise ImportError("soundfile is required to use MaaiInput.Wav. Install soundfile and retry.") from exc
+        try:
+            self.pygame = importlib.import_module("pygame")
+        except ImportError as exc:
+            raise ImportError("pygame is required to use MaaiInput.Wav playback. Install pygame and retry.") from exc
         self.wav_file_path = wav_file_path
         self.audio_gain = audio_gain
         self.raw_wav_queue = queue.Queue()
@@ -138,11 +156,11 @@ class Wav(Base):
             raise FileNotFoundError(f"WAV file not found: {self.wav_file_path}")
         
         # Check the frame rate of the WAV file
-        self.SAMPLING_RATE = sf.info(self.wav_file_path).samplerate
+        self.SAMPLING_RATE = self.sf.info(self.wav_file_path).samplerate
         if self.SAMPLING_RATE != 16000:
             raise ValueError(f"Unsupported sample rate: {self.SAMPLING_RATE}. Expected 16000 Hz.")
         
-        data, _ = sf.read(file=self.wav_file_path, dtype='float32')
+        data, _ = self.sf.read(file=self.wav_file_path, dtype='float32')
         for i in range(0, len(data), self.FRAME_SIZE):
             if i + self.FRAME_SIZE > len(data):
                 break
@@ -152,8 +170,8 @@ class Wav(Base):
     def _read_wav(self):
         start_time = time.time()
         frame_duration = self.FRAME_SIZE / self.SAMPLING_RATE
-        pygame.mixer.init(frequency=16000, size=-16, channels=1, buffer=512)
-        sound = pygame.mixer.Sound(self.wav_file_path)
+        self.pygame.mixer.init(frequency=16000, size=-16, channels=1, buffer=512)
+        sound = self.pygame.mixer.Sound(self.wav_file_path)
         sound.play()
         frame_count = 0
         while True:
@@ -300,6 +318,12 @@ class Tcp(Base):
 
 class TcpMic(Base):
     def __init__(self, server_ip='127.0.0.1', port=8501, audio_gain=1.0, mic_device_index=0):
+        super().__init__()
+        if pyaudio is None:
+            try:
+                globals()["pyaudio"] = importlib.import_module("pyaudio")
+            except ImportError as exc:
+                raise ImportError("pyaudio is required to use MaaiInput.TcpMic. Install pyaudio and retry.") from exc
         self.ip = server_ip
         self.port = port
         self.p = pyaudio.PyAudio()
