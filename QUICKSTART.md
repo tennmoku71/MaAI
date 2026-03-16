@@ -1,6 +1,7 @@
 # Quickstart (standalone binary)
 
-> **Current support status:** the prebuilt standalone binary flow in this guide is **macOS-only for now**.
+> **Current support status:** the prebuilt standalone binary (zip) is **macOS-only for now**.  
+> For **Windows**, build the standalone executable locally—see [build/nuitka/README.md](build/nuitka/README.md).
 
 This guide explains how to run the prebuilt standalone binary and connect it from an external app (for example, Node.js) over TCP.
 
