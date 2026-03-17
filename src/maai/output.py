@@ -219,6 +219,10 @@ class TcpTransmitter:
         self.port = port
         self.mode = mode
         self.result_queue = queue.Queue()
+        self._server_thread_started = False
+        self._send_thread_started = False
+        self._clients = []
+        self._clients_lock = threading.Lock()
     
     def _vapresult_2_bytearray(self, result_dict: Dict[str, Any]) -> bytes:
         if self.mode in ['vap', 'vap_mc']:
@@ -231,31 +235,55 @@ class TcpTransmitter:
             raise ValueError(f"Invalid mode: {self.mode}")
         return data_sent
         
+    def _remove_client(self, conn):
+        with self._clients_lock:
+            if conn in self._clients:
+                self._clients.remove(conn)
+        try:
+            conn.close()
+        except Exception:
+            pass
+
     def _start_server(self):
         while True:
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((self.ip, self.port))
-                s.listen(1)
+                s.listen(8)
                 print('[OUT] Waiting for connection...')
-                conn, addr = s.accept()
-                print('[OUT] Connected by', addr)
                 while True:
-                    try:
-                        result_dict = self.result_queue.get()
-                        data_sent = self._vapresult_2_bytearray(result_dict)
-                        data_sent_all = len(data_sent).to_bytes(4, 'little') + data_sent
-                        conn.sendall(data_sent_all)
-                    except Exception as e:
-                        print('[OUT] Send error:', e)
-                        break
+                    conn, addr = s.accept()
+                    with self._clients_lock:
+                        self._clients.append(conn)
+                    print('[OUT] Connected by', addr)
             except Exception as e:
-                print('[OUT] Disconnected by', addr)
-                print(e)
+                print('[OUT] Server error:', e)
+                time.sleep(0.5)
                 continue
-            
+
+    def _send_loop(self):
+        while True:
+            result_dict = self.result_queue.get()
+            data_sent = self._vapresult_2_bytearray(result_dict)
+            data_sent_all = len(data_sent).to_bytes(4, 'little') + data_sent
+            with self._clients_lock:
+                clients = list(self._clients)
+
+            for conn in clients:
+                try:
+                    conn.sendall(data_sent_all)
+                except Exception as e:
+                    print('[OUT] Send error:', e)
+                    self._remove_client(conn)
+
     def start_server(self):
-        threading.Thread(target=self._start_server, daemon=True).start()
+        if not self._server_thread_started:
+            threading.Thread(target=self._start_server, daemon=True).start()
+            self._server_thread_started = True
+        if not self._send_thread_started:
+            threading.Thread(target=self._send_loop, daemon=True).start()
+            self._send_thread_started = True
         
     def update(self, result: Dict[str, Any]):
         self.result_queue.put(result)
